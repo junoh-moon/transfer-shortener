@@ -5,8 +5,6 @@ metadata:
   namespace: default
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
-    flame.pawelmalak/icon: link-variant
-    flame.pawelmalak/name: t.sixtyfive.me
 spec:
   ingressClassName: haproxy
   tls:

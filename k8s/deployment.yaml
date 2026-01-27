@@ -5,6 +5,10 @@ metadata:
   namespace: default
   labels:
     app: transfer-shortener
+  annotations:
+    watch-cluster.io/enabled: "true"
+    watch-cluster.io/strategy: latest
+    watch-cluster.io/cron: "0 */10 * * * ?"
 spec:
   replicas: 1
   selector:
@@ -20,10 +24,12 @@ spec:
       labels:
         app: transfer-shortener
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: shortener
-          image: transfer-shortener:latest
-          imagePullPolicy: IfNotPresent
+          image: hub.sixtyfive.me/transfer-shortener:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               protocol: TCP

@@ -10,7 +10,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   hostPath:
-    path: /data/transfer-shortener
+    path: /mnt/elements/micro_services/transfer-shortener/data
     type: DirectoryOrCreate
   nodeAffinity:
     required:
