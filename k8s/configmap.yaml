@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transfer-shortener-config
+  namespace: default
+data:
+  LISTEN_ADDR: ":8080"
+  BACKEND_URL: "http://transfer:5327"
+  PUBLIC_URL: "https://t.sixtyfive.me"
+  DB_PATH: "/data/shortener.db"

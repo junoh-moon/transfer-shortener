@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: transfer-shortener-ingress
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    flame.pawelmalak/icon: link-variant
+    flame.pawelmalak/name: t.sixtyfive.me
+spec:
+  ingressClassName: haproxy
+  tls:
+    - hosts:
+        - t.sixtyfive.me
+      secretName: transfer-shortener-tls
+  rules:
+    - host: t.sixtyfive.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: transfer-shortener
+                port:
+                  number: 8080

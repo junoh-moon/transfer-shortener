@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: transfer-shortener
+  namespace: default
+  labels:
+    app: transfer-shortener
+spec:
+  type: ClusterIP
+  selector:
+    app: transfer-shortener
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
