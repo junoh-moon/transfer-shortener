@@ -231,7 +231,7 @@ func TestHandler_FullPath_ProxiesToBackend(t *testing.T) {
 			return "", errors.New("not found") // short token not found
 		},
 	}
-	proxy := handler.NewTransferProxy(backend.URL)
+	proxy := handler.NewTransferProxy(backend.URL, "https://transfer.sixtyfive.me")
 
 	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
 

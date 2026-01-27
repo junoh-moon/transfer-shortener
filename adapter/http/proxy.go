@@ -3,18 +3,20 @@ package http
 import (
 	"io"
 	"net/http"
-	"strings"
+	"net/url"
 	"time"
 )
 
 type TransferProxy struct {
 	backendURL string
+	publicURL  string
 	client     *http.Client
 }
 
-func NewTransferProxy(backendURL string) *TransferProxy {
+func NewTransferProxy(backendURL, publicURL string) *TransferProxy {
 	return &TransferProxy{
 		backendURL: backendURL,
+		publicURL:  publicURL,
 		client: &http.Client{
 			Timeout: 10 * time.Minute,
 		},
@@ -46,8 +48,15 @@ func (p *TransferProxy) ProxyUpload(w http.ResponseWriter, r *http.Request) (str
 		return "", err
 	}
 
-	fullURL := strings.TrimSpace(string(body))
-	return fullURL, nil
+	// Transform internal backend URL to public URL
+	publicParsed, _ := url.Parse(p.publicURL)
+	returnedURL, err := url.Parse(string(body))
+	if err != nil {
+		return "", err
+	}
+	returnedURL.Scheme = publicParsed.Scheme
+	returnedURL.Host = publicParsed.Host
+	return returnedURL.String(), nil
 }
 
 func (p *TransferProxy) ProxyGet(w http.ResponseWriter, r *http.Request) {

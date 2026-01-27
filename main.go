@@ -10,6 +10,12 @@ import (
 	"transfer-shortener/usecase"
 )
 
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildTime = "unknown"
+)
+
 func main() {
 	config := loadConfig()
 
@@ -21,10 +27,11 @@ func main() {
 
 	createUC := usecase.NewCreateShortURL(repo)
 	resolveUC := usecase.NewResolveShortURL(repo)
-	proxy := httpAdapter.NewTransferProxy(config.BackendURL)
+	proxy := httpAdapter.NewTransferProxy(config.BackendURL, config.PublicURL)
 
 	handler := httpAdapter.NewHandler(createUC, resolveUC, proxy, config.PublicURL)
 
+	log.Printf("transfer-shortener version=%s commit=%s built=%s", version, commit, buildTime)
 	log.Printf("Starting server on %s", config.ListenAddr)
 	log.Printf("Backend: %s", config.BackendURL)
 	log.Printf("Public URL: %s", config.PublicURL)
