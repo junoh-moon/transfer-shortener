@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -50,6 +51,10 @@ func (p *TransferProxy) ProxyUpload(w http.ResponseWriter, r *http.Request) (str
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("backend returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Transform internal backend URL to public URL

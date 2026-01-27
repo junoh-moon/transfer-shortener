@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -61,6 +62,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	fullURL, err := h.proxy.ProxyUpload(w, r)
 	if err != nil {
+		log.Printf("proxy error: %v", err)
 		http.Error(w, "Backend error", http.StatusBadGateway)
 		return
 	}
