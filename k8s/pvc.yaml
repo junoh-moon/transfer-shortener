@@ -6,7 +6,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: local-storage
+  storageClassName: ""
+  volumeName: transfer-shortener-pv
   resources:
     requests:
       storage: 100Mi
