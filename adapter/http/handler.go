@@ -19,6 +19,7 @@ type ResolveShortURLUseCase interface {
 
 type BackendProxy interface {
 	ProxyUpload(w http.ResponseWriter, r *http.Request) (string, error)
+	ProxyGet(w http.ResponseWriter, r *http.Request)
 }
 
 type Handler struct {
@@ -51,7 +52,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && r.URL.Path == "/":
 		h.handleIndex(w, r)
 	case r.Method == http.MethodGet:
-		h.handleRedirect(w, r)
+		h.handleGet(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -75,13 +76,20 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(result))
 }
 
-func (h *Handler) handleRedirect(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimPrefix(r.URL.Path, "/")
-	token = strings.Split(token, "/")[0]
+func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/")
 
-	fullURL, err := h.resolveUC.Execute(r.Context(), token)
+	// If path contains slash (e.g., "abc12/file.txt"), proxy to backend
+	if strings.Contains(path, "/") {
+		h.proxy.ProxyGet(w, r)
+		return
+	}
+
+	// Try to resolve as short token
+	fullURL, err := h.resolveUC.Execute(r.Context(), path)
 	if err != nil {
-		http.Error(w, "Not found", http.StatusNotFound)
+		// Not a short token, proxy to backend
+		h.proxy.ProxyGet(w, r)
 		return
 	}
 

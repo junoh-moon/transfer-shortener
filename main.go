@@ -45,7 +45,7 @@ func loadConfig() Config {
 	return Config{
 		ListenAddr: getEnv("LISTEN_ADDR", ":8080"),
 		BackendURL: getEnv("BACKEND_URL", "http://transfer:5327"),
-		PublicURL:  getEnv("PUBLIC_URL", "https://t.sixtyfive.me"),
+		PublicURL:  getEnv("PUBLIC_URL", "https://transfer.sixtyfive.me"),
 		DBPath:     getEnv("DB_PATH", "/data/shortener.db"),
 	}
 }

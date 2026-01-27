@@ -49,3 +49,36 @@ func (p *TransferProxy) ProxyUpload(w http.ResponseWriter, r *http.Request) (str
 	fullURL := strings.TrimSpace(string(body))
 	return fullURL, nil
 }
+
+func (p *TransferProxy) ProxyGet(w http.ResponseWriter, r *http.Request) {
+	targetURL := p.backendURL + r.URL.Path
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, targetURL, nil)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	for key, values := range r.Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		http.Error(w, "Backend error", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Copy response headers
+	for key, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}

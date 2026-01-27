@@ -9,10 +9,10 @@ spec:
   ingressClassName: haproxy
   tls:
     - hosts:
-        - t.sixtyfive.me
+        - transfer.sixtyfive.me
       secretName: transfer-shortener-tls
   rules:
-    - host: t.sixtyfive.me
+    - host: transfer.sixtyfive.me
       http:
         paths:
           - path: /
