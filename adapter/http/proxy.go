@@ -31,7 +31,11 @@ func (p *TransferProxy) ProxyUpload(w http.ResponseWriter, r *http.Request) (str
 		return "", err
 	}
 
+	req.ContentLength = r.ContentLength
 	for key, values := range r.Header {
+		if key == "Host" {
+			continue
+		}
 		for _, value := range values {
 			req.Header.Add(key, value)
 		}
