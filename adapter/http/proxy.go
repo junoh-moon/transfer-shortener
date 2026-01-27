@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -59,7 +60,7 @@ func (p *TransferProxy) ProxyUpload(w http.ResponseWriter, r *http.Request) (str
 
 	// Transform internal backend URL to public URL
 	publicParsed, _ := url.Parse(p.publicURL)
-	returnedURL, err := url.Parse(string(body))
+	returnedURL, err := url.Parse(strings.TrimSpace(string(body)))
 	if err != nil {
 		return "", err
 	}
