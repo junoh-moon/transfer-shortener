@@ -410,3 +410,141 @@ func TestHandler_Index_VaryHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestHandler_Upload_ProxyError_ReturnsBadGateway(t *testing.T) {
+	// When proxy fails, should return 502 Bad Gateway
+	createUC := &mockCreateShortURL{}
+	resolveUC := &mockResolveShortURL{}
+	proxy := &mockBackendProxy{
+		proxyUploadFunc: func(w http.ResponseWriter, r *http.Request) (string, error) {
+			return "", errors.New("backend connection failed")
+		},
+	}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodPut, "/file.txt", strings.NewReader("content"))
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Errorf("expected status 502, got %d", rec.Code)
+	}
+}
+
+func TestHandler_Upload_CreateShortURLError_ReturnsInternalError(t *testing.T) {
+	// When creating short URL fails, should return 500 Internal Server Error
+	createUC := &mockCreateShortURL{
+		executeFunc: func(ctx context.Context, fullURL string) (*entity.ShortURL, error) {
+			return nil, errors.New("database error")
+		},
+	}
+	resolveUC := &mockResolveShortURL{}
+	proxy := &mockBackendProxy{
+		proxyUploadFunc: func(w http.ResponseWriter, r *http.Request) (string, error) {
+			return "https://transfer.sixtyfive.me/abc12/file.txt", nil
+		},
+	}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodPut, "/file.txt", strings.NewReader("content"))
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", rec.Code)
+	}
+}
+
+func TestHandler_MethodNotAllowed(t *testing.T) {
+	// Unsupported methods should return 405 Method Not Allowed
+	createUC := &mockCreateShortURL{}
+	resolveUC := &mockResolveShortURL{}
+	proxy := &mockBackendProxy{}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	methods := []string{http.MethodDelete, http.MethodPatch, http.MethodOptions}
+
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			req := httptest.NewRequest(method, "/file.txt", nil)
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Errorf("expected status 405 for %s, got %d", method, rec.Code)
+			}
+		})
+	}
+}
+
+func TestTransferProxy_ProxyUpload_Success(t *testing.T) {
+	// Test real proxy upload with mock backend server
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT, got %s", r.Method)
+		}
+		if r.URL.Path != "/file.txt" {
+			t.Errorf("expected path /file.txt, got %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("http://backend:5327/abc12/file.txt\n"))
+	}))
+	defer backend.Close()
+
+	proxy := handler.NewTransferProxy(backend.URL, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodPut, "/file.txt", strings.NewReader("file content"))
+	rec := httptest.NewRecorder()
+
+	fullURL, err := proxy.ProxyUpload(rec, req)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should transform backend URL to public URL
+	expected := "https://transfer.sixtyfive.me/abc12/file.txt"
+	if fullURL != expected {
+		t.Errorf("expected %s, got %s", expected, fullURL)
+	}
+}
+
+func TestTransferProxy_ProxyUpload_BackendError(t *testing.T) {
+	// Test proxy when backend returns error
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error"))
+	}))
+	defer backend.Close()
+
+	proxy := handler.NewTransferProxy(backend.URL, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodPut, "/file.txt", strings.NewReader("content"))
+	rec := httptest.NewRecorder()
+
+	_, err := proxy.ProxyUpload(rec, req)
+
+	if err == nil {
+		t.Error("expected error when backend returns 500")
+	}
+}
+
+func TestTransferProxy_ProxyGet_BackendError(t *testing.T) {
+	// Test proxy GET when backend connection fails
+	proxy := handler.NewTransferProxy("http://localhost:1", "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodGet, "/abc12/file.txt", nil)
+	rec := httptest.NewRecorder()
+
+	proxy.ProxyGet(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Errorf("expected status 502, got %d", rec.Code)
+	}
+}
