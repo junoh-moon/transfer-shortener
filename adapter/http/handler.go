@@ -99,7 +99,18 @@ func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
+	// Vary header for CDN caching - response differs based on Accept header
+	w.Header().Add("Vary", "Accept")
+
+	// Browser requests (Accept: text/html) get proxied to backend for web frontend
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "text/html") {
+		h.proxy.ProxyGet(w, r)
+		return
+	}
+
+	// CLI requests get usage text
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	fmt.Fprintf(w, "Transfer Shortener\n\n")
 	fmt.Fprintf(w, "Upload: curl --upload-file ./file.txt %s/file.txt\n", h.publicURL)
 	fmt.Fprintf(w, "Or:     curl -F filedata=@./file.txt %s/\n", h.publicURL)

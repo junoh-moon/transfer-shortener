@@ -280,3 +280,133 @@ func TestHandler_ShortToken_Redirects(t *testing.T) {
 		t.Errorf("expected Location %s, got %s", fullURL, location)
 	}
 }
+
+func TestHandler_Index_BrowserRequest_ProxiesToBackend(t *testing.T) {
+	// Browser requests (Accept: text/html) should proxy to backend for web frontend
+	createUC := &mockCreateShortURL{}
+	resolveUC := &mockResolveShortURL{}
+
+	var proxyCalled bool
+	proxy := &mockBackendProxy{
+		proxyGetFunc: func(w http.ResponseWriter, r *http.Request) {
+			proxyCalled = true
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("<html>Web Frontend</html>"))
+		},
+	}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if !proxyCalled {
+		t.Error("expected proxy to be called for browser request with Accept: text/html")
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_Index_CLIRequest_ReturnsUsageText(t *testing.T) {
+	// CLI requests (no Accept header or Accept: */*) should return usage text
+	createUC := &mockCreateShortURL{}
+	resolveUC := &mockResolveShortURL{}
+
+	var proxyCalled bool
+	proxy := &mockBackendProxy{
+		proxyGetFunc: func(w http.ResponseWriter, r *http.Request) {
+			proxyCalled = true
+		},
+	}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	// Test with no Accept header (like curl default)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if proxyCalled {
+		t.Error("proxy should NOT be called for CLI request without Accept: text/html")
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rec.Code)
+	}
+
+	body, _ := io.ReadAll(rec.Body)
+	if !strings.Contains(string(body), "curl") {
+		t.Errorf("expected usage text with curl example, got %q", string(body))
+	}
+}
+
+func TestHandler_Index_CLIRequestWithWildcard_ReturnsUsageText(t *testing.T) {
+	// CLI with Accept: */* should return usage text, not proxy
+	createUC := &mockCreateShortURL{}
+	resolveUC := &mockResolveShortURL{}
+
+	var proxyCalled bool
+	proxy := &mockBackendProxy{
+		proxyGetFunc: func(w http.ResponseWriter, r *http.Request) {
+			proxyCalled = true
+		},
+	}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if proxyCalled {
+		t.Error("proxy should NOT be called for CLI request with Accept: */*")
+	}
+}
+
+func TestHandler_Index_VaryHeader(t *testing.T) {
+	// All index responses should include Vary: Accept header for CDN caching
+	createUC := &mockCreateShortURL{}
+	resolveUC := &mockResolveShortURL{}
+	proxy := &mockBackendProxy{
+		proxyGetFunc: func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		},
+	}
+
+	h := handler.NewHandler(createUC, resolveUC, proxy, "https://transfer.sixtyfive.me")
+
+	tests := []struct {
+		name   string
+		accept string
+	}{
+		{"browser request", "text/html"},
+		{"CLI request", ""},
+		{"wildcard request", "*/*"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.accept != "" {
+				req.Header.Set("Accept", tt.accept)
+			}
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			vary := rec.Header().Get("Vary")
+			if !strings.Contains(vary, "Accept") {
+				t.Errorf("expected Vary header to contain 'Accept', got %q", vary)
+			}
+		})
+	}
+}
