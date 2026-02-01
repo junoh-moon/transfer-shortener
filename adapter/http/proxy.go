@@ -78,7 +78,14 @@ func (p *TransferProxy) ProxyGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set Host header to public URL so backend generates correct URLs
+	publicParsed, _ := url.Parse(p.publicURL)
+	req.Host = publicParsed.Host
+
 	for key, values := range r.Header {
+		if key == "Host" {
+			continue
+		}
 		for _, value := range values {
 			req.Header.Add(key, value)
 		}

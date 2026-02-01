@@ -548,3 +548,27 @@ func TestTransferProxy_ProxyGet_BackendError(t *testing.T) {
 		t.Errorf("expected status 502, got %d", rec.Code)
 	}
 }
+
+func TestTransferProxy_ProxyGet_SetsPublicHostHeader(t *testing.T) {
+	// ProxyGet should set Host header to public URL so backend generates correct URLs
+	var receivedHost string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHost = r.Host
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("<html>Web Frontend</html>"))
+	}))
+	defer backend.Close()
+
+	proxy := handler.NewTransferProxy(backend.URL, "https://transfer.sixtyfive.me")
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept", "text/html")
+	rec := httptest.NewRecorder()
+
+	proxy.ProxyGet(rec, req)
+
+	expectedHost := "transfer.sixtyfive.me"
+	if receivedHost != expectedHost {
+		t.Errorf("expected Host header %q, got %q", expectedHost, receivedHost)
+	}
+}
